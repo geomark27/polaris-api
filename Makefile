@@ -53,14 +53,12 @@ help:
 	@echo "  $(YELLOW)make test-unit$(NC)          - Solo tests unitarios"
 	@echo "  $(YELLOW)make test-integration$(NC)   - Solo tests de integracion"
 	@echo ""
-	@echo "$(GREEN)DOCKER:$(NC)"
-	@echo "  $(YELLOW)make docker-up$(NC)          - Levantar PostgreSQL"
-	@echo "  $(YELLOW)make docker-down$(NC)        - Detener servicios"
-	@echo "  $(YELLOW)make docker-clean$(NC)       - Eliminar contenedores y volumenes"
-	@echo "  $(YELLOW)make docker-logs$(NC)        - Ver logs en tiempo real"
-	@echo "  $(YELLOW)make restart$(NC)            - Reiniciar servicios"
-	@echo ""
 	@echo "$(GREEN)BASE DE DATOS:$(NC)"
+	@echo "  $(YELLOW)make db-up$(NC)              - Levantar PostgreSQL"
+	@echo "  $(YELLOW)make db-down$(NC)            - Detener servicios"
+	@echo "  $(YELLOW)make db-clean$(NC)           - Eliminar contenedores y volumenes"
+	@echo "  $(YELLOW)make db-logs$(NC)            - Ver logs en tiempo real"
+	@echo "  $(YELLOW)make restart$(NC)            - Reiniciar servicios"
 	@echo "  $(YELLOW)make db-connect$(NC)         - Conectar a PostgreSQL (psql)"
 	@echo "  $(YELLOW)make db-reset$(NC)           - Resetear base de datos"
 	@echo ""
@@ -136,30 +134,30 @@ setup:
 	@echo ""
 
 # ============================================================
-# DOCKER
+# BASE DE DATOS (DOCKER)
 # ============================================================
 
-## docker-up: Levanta PostgreSQL
-docker-up:
+## db-up: Levanta PostgreSQL
+db-up:
 	@echo "$(GREEN)Levantando PostgreSQL con Docker Compose...$(NC)"
 	@$(COMPOSE) up -d postgres
 	@echo "$(GREEN)OK Servicios iniciados$(NC)"
 	@echo "$(BLUE)   PostgreSQL: localhost:5433 (DB: $(DB_NAME))$(NC)"
 
-## docker-down: Detiene todos los servicios
-docker-down:
+## db-down: Detiene todos los servicios
+db-down:
 	@echo "$(YELLOW)Deteniendo servicios...$(NC)"
 	@$(COMPOSE) down
 	@echo "$(GREEN)OK Servicios detenidos$(NC)"
 
-## docker-clean: Elimina contenedores y volumenes (borra datos)
-docker-clean:
+## db-clean: Elimina contenedores y volumenes (borra datos)
+db-clean:
 	@echo "$(RED)Eliminando contenedores y volumenes...$(NC)"
 	@$(COMPOSE) down -v
 	@echo "$(GREEN)OK Limpieza completada$(NC)"
 
-## docker-logs: Muestra logs de todos los servicios en tiempo real
-docker-logs:
+## db-logs: Muestra logs de todos los servicios en tiempo real
+db-logs:
 	@echo "$(BLUE)Logs en tiempo real (Ctrl+C para salir):$(NC)"
 	@$(COMPOSE) logs -f
 
@@ -168,10 +166,6 @@ restart:
 	@echo "$(YELLOW)Reiniciando servicios...$(NC)"
 	@$(COMPOSE) restart
 	@echo "$(GREEN)OK Servicios reiniciados$(NC)"
-
-# ============================================================
-# BASE DE DATOS
-# ============================================================
 
 ## db-connect: Conecta a PostgreSQL via psql
 db-connect:
