@@ -10,6 +10,8 @@ import com.azenticsys.polaris.user.entity.User;
 import com.azenticsys.polaris.user.repository.UserRepository;
 import com.azenticsys.polaris.user.repository.UserSpecification;
 import lombok.RequiredArgsConstructor;
+import lombok.var;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,13 +55,14 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<UserResponse> findAll(PageQuery pageQuery, UserFilter filter) {
-        return PageResponse.from(
-                userRepository.findAll(
-                        UserSpecification.withFilter(filter),
-                        pageQuery.toPageable()
-                ).map(UserResponse::from)
+    public PageResponse<UserResponse> findAll(PageQuery pageQuery, UserFilter filter) { 
+        var response = PageResponse.from(
+            userRepository.findAll(
+                UserSpecification.withFilter(filter),
+                pageQuery.toPageable()
+            ).map(UserResponse::from)
         );
+        return response;
     }
 
     @Override
