@@ -1,6 +1,6 @@
 # Technical Reference — Polaris ERP API
 
-_Última actualización: 2026-02-25 (Sprint 5 en progreso — módulos SystemValue y Product completados)_
+_Última actualización: 2026-03-07 (Multi-tenancy implementado — schema por tenant en PostgreSQL)_
 
 ---
 
@@ -44,10 +44,15 @@ src/main/java/com/azenticsys/polaris/
 ├── PolarisApiApplication.java            # Entry point, @EnableScheduling
 ├── config/
 │   ├── SecurityConfig.java               # FilterChain, CORS, AuthProvider, PasswordEncoder
-│   ├── JwtService.java                   # Generación y validación de tokens
-│   ├── JwtAuthenticationFilter.java      # Interceptor: extrae y valida JWT por request
-│   ├── DataInitializer.java              # Seeder: admin + system values al primer arranque
-│   └── OpenApiConfig.java                # Swagger / OpenAPI con Bearer JWT
+│   ├── JwtService.java                   # Generación y validación de tokens (incluye tenantSchema claim)
+│   ├── JwtAuthenticationFilter.java      # Interceptor: extrae JWT, setea TenantContext
+│   ├── DataSourceConfig.java             # Define TenantAwareDataSource como bean @Primary
+│   ├── DataInitializer.java              # Seeder: crea tenant "polaris" + admin + system values
+│   ├── OpenApiConfig.java                # Swagger / OpenAPI con Bearer JWT
+│   └── multitenancy/
+│       ├── TenantContext.java            # ThreadLocal: schema name activo en el request
+│       ├── TenantAwareDataSource.java    # DataSource wrapper: SET search_path por request
+│       └── TenantFilter.java            # Filter @Order(1): resuelve tenant desde X-Tenant-ID header
 ├── common/
 │   ├── exception/
 │   │   ├── ApiError.java                 # DTO de respuesta de error estandarizada
@@ -74,6 +79,12 @@ src/main/java/com/azenticsys/polaris/
 │   ├── repository/SystemValueRepository.java + SystemValueSpecification.java
 │   ├── entity/SystemValue.java
 │   └── dto/CreateSystemValueRequest, UpdateSystemValueRequest, SystemValueResponse, SystemValueFilter
+├── tenant/                               # Módulo Tenant (landlord — gestión de organizaciones)
+│   ├── controller/TenantController.java
+│   ├── service/TenantService.java + TenantServiceImpl.java
+│   ├── repository/TenantRepository.java
+│   ├── entity/Tenant.java                # @Table(schema="landlord") — identidad de cada org
+│   └── dto/CreateTenantRequest, TenantResponse
 └── product/                              # Módulo Product
     ├── controller/ProductController.java + ProductCategoryController.java
     ├── service/ProductService.java + ProductServiceImpl.java
@@ -831,6 +842,90 @@ El campo `errors` solo aparece en errores de validación (`400`). En los demás 
 
 ---
 
+## Multi-tenancy — Arquitectura
+
+### Estrategia: Schema por tenant en PostgreSQL
+
+Cada organización (tenant) obtiene su propio schema PostgreSQL. Un solo cluster PostgreSQL, una sola base de datos, schemas separados.
+
+```
+polaris_db
+├── schema: landlord          ← datos del sistema SaaS
+│   ├── tenants               ← registro de organizaciones (slug, schemaName, email)
+│   └── revoked_tokens        ← blacklist de JWTs revocados (global)
+│
+├── schema: public            ← tablas template (creadas por Hibernate DDL al arrancar)
+│   ├── users                 ← template (no contiene datos reales)
+│   ├── products              ← template
+│   └── ...
+│
+├── schema: t_polaris         ← tenant "polaris" (desarrollo por defecto)
+│   ├── users
+│   ├── products
+│   └── ...
+│
+└── schema: t_torresytorres   ← tenant "torres-y-torres" (ejemplo real)
+    ├── users
+    ├── products
+    └── ...
+```
+
+### Resolución del tenant por request
+
+```
+1. TenantFilter (@Order 1):
+   Lee X-Tenant-ID header (slug, ej: "torresytorres")
+   → Busca en landlord.tenants → obtiene schemaName
+   → TenantContext.set("t_torresytorres")
+
+2. JwtAuthenticationFilter:
+   Extrae tenantSchema del claim JWT (sobreescribe TenantContext — más seguro)
+   → TenantContext.set("t_torresytorres")
+
+3. TenantAwareDataSource.getConnection():
+   Lee TenantContext.get() → "t_torresytorres"
+   → SET search_path TO t_torresytorres, landlord, public
+
+4. Todas las queries del request resuelven contra t_torresytorres.*
+   Entidades landlord (RevokedToken, Tenant) usan schema explícito en @Table
+   → Siempre acceden landlord.* independientemente del search_path
+```
+
+### Tenant slug vs schemaName
+
+| Concepto | Ejemplo | Uso |
+|---|---|---|
+| `slug` | `torres-y-torres` | URL-friendly, visible para el usuario |
+| `schemaName` | `t_torres_y_torres` | Schema PostgreSQL interno |
+| Derivación | `"t_" + slug.replace("-", "_")` | Automático al crear |
+
+### Creación de tenant (nueva organización)
+
+```
+POST /api/v1/tenants/register
+{ "name": "Torres y Torres S.A.", "slug": "torres-y-torres", "email": "admin@torresytorres.com" }
+
+1. Valida slug único + email único
+2. Inserta en landlord.tenants
+3. CREATE SCHEMA IF NOT EXISTS t_torres_y_torres
+4. Para cada tabla tenant: CREATE TABLE t_torres_y_torres.{tabla} (LIKE public.{tabla} INCLUDING ALL)
+5. Agrega FK products → product_categories en el nuevo schema
+```
+
+### Flujo de login (tenant)
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "X-Tenant-ID: torres-y-torres" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"Admin1234!"}'
+
+# Response incluye tenantSlug en el body y tenantSchema embebido en el JWT
+# Requests autenticados posteriores: el JWT lleva el tenantSchema, no es necesario el header
+```
+
+---
+
 ## Base de datos
 
 PostgreSQL corre en Docker. Para levantarla:
@@ -845,4 +940,6 @@ make db-connect
 # equivale a: docker compose exec postgres psql -U <DB_USER> -d <DB_NAME>
 ```
 
-Hibernate gestiona el schema automáticamente con `ddl-auto=update` en desarrollo. En producción se debe cambiar a `validate` y gestionar migraciones manualmente o con Flyway/Liquibase. <!-- TODO: evaluar adopción de Flyway -->
+Al arrancar, Spring ejecuta `schema.sql` (crea el schema `landlord`) y luego Hibernate DDL crea las tablas. El schema `public` actúa como template para clonar al crear nuevos tenants.
+
+En producción cambiar `ddl-auto` a `validate` y gestionar migraciones con Flyway.

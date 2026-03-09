@@ -4,7 +4,33 @@ REST API stateless para el sistema ERP multi-tenant Polaris.
 
 **Stack:** Java 21 · Spring Boot 4.0.3 · PostgreSQL 16 · JWT (jjwt 0.12.6) · Lombok · SpringDoc OpenAPI 3.0
 
-**Estado actual:** 58% completo (4 de 6 sprints completados)
+**Estado actual:** 74% completo — Multi-tenancy implementado (Sprint 0 completo)
+
+---
+
+## Multi-tenancy (CORE)
+
+**Estrategia:** Schema por tenant en PostgreSQL. Un solo cluster, una DB, schemas separados.
+
+- `landlord` schema: `tenants`, `revoked_tokens` (datos del sistema SaaS)
+- `public` schema: tablas template creadas por Hibernate DDL al arrancar
+- `t_{slug}` schema: un schema por cada organización registrada (ej: `t_torres_y_torres`)
+
+**Resolución del tenant por request:**
+1. `TenantFilter` lee header `X-Tenant-ID` (slug) → busca en `landlord.tenants` → setea `TenantContext`
+2. `JwtAuthenticationFilter` lee `tenantSchema` del claim JWT → sobreescribe `TenantContext` (más seguro)
+3. `TenantAwareDataSource.getConnection()` ejecuta `SET search_path TO {schema}, landlord, public`
+4. Todas las queries del request resuelven contra el schema del tenant
+
+**Slug style:** Como Atlassian — nombre URL-friendly elegido al registrar (ej: `torres-y-torres`, no el RUC).
+
+**Login:**
+```bash
+curl -X POST /api/v1/auth/login \
+  -H "X-Tenant-ID: torres-y-torres" \
+  -d '{"username":"admin","password":"Admin1234!"}'
+# El JWT devuelto incluye tenantSchema → ya no necesitas el header en requests posteriores
+```
 
 ---
 
@@ -15,25 +41,36 @@ com.azenticsys.polaris/
 ├── PolarisApiApplication.java       # Entry point, @EnableScheduling
 ├── config/                          # Configuración global
 │   ├── SecurityConfig.java          # Spring Security + JWT filter chain + CORS
-│   ├── JwtService.java              # Generación y validación de tokens
-│   ├── JwtAuthenticationFilter.java # Filtro HTTP: valida JWT en cada request
-│   ├── DataInitializer.java         # Seeder: crea usuario admin al arrancar
-│   └── OpenApiConfig.java           # Swagger/OpenAPI con Bearer auth
+│   ├── JwtService.java              # Tokens JWT (incluye tenantSchema claim)
+│   ├── JwtAuthenticationFilter.java # Valida JWT + setea TenantContext desde claim
+│   ├── DataSourceConfig.java        # @Primary DataSource = TenantAwareDataSource
+│   ├── DataInitializer.java         # Seeder: crea tenant "polaris" + admin + catalogos
+│   ├── OpenApiConfig.java           # Swagger/OpenAPI con Bearer auth
+│   └── multitenancy/
+│       ├── TenantContext.java       # ThreadLocal: schema name activo
+│       ├── TenantAwareDataSource.java # DataSource que hace SET search_path
+│       └── TenantFilter.java        # Filter @Order(1): resuelve desde X-Tenant-ID
 ├── common/
 │   └── exception/
 │       ├── ApiError.java            # DTO de error estandarizado
 │       └── GlobalExceptionHandler.java  # @RestControllerAdvice
+├── tenant/                          # Módulo landlord — gestión de organizaciones
+│   ├── controller/TenantController.java
+│   ├── service/TenantService.java + TenantServiceImpl.java
+│   ├── entity/Tenant.java           # @Table(schema="landlord") — slug, schemaName
+│   ├── repository/TenantRepository.java
+│   └── dto/CreateTenantRequest, TenantResponse
 ├── auth/                            # Módulo autenticación
 │   ├── controller/AuthController.java
 │   ├── service/AuthService.java + AuthServiceImpl.java
-│   ├── entity/RevokedToken.java     # Blacklist de tokens revocados
+│   ├── entity/RevokedToken.java     # @Table(schema="landlord") — blacklist global
 │   ├── repository/RevokedTokenRepository.java
 │   ├── scheduler/TokenCleanupScheduler.java  # Limpieza diaria de tokens expirados
-│   └── dto/LoginRequest, RefreshTokenRequest, AuthResponse
-└── user/                            # Módulo usuarios
+│   └── dto/LoginRequest, RefreshTokenRequest, AuthResponse (incluye tenantSlug)
+└── user/                            # Módulo usuarios (schema del tenant)
     ├── controller/UserController.java
     ├── service/UserService.java + UserServiceImpl.java + UserDetailsServiceImpl.java
-    ├── entity/User.java
+    ├── entity/User.java             # Sin schema explícito → resuelve vía search_path
     ├── repository/UserRepository.java
     └── dto/CreateUserRequest, UpdateUserRequest, UserResponse
 ```
@@ -51,11 +88,19 @@ Cada módulo nuevo sigue esta estructura en `com.azenticsys.polaris.{nombre}/`:
 
 ## Endpoints
 
-### Auth — `/api/v1/auth` (público)
+### Tenants — `/api/v1/tenants` (landlord)
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| POST | `/api/v1/tenants/register` | público | Registrar nueva organización → crea schema PostgreSQL |
+| GET | `/api/v1/tenants` | JWT | Listar tenants |
+| GET | `/api/v1/tenants/{id}` | JWT | Obtener tenant por UUID |
+| DELETE | `/api/v1/tenants/{id}` | JWT | Desactivar tenant |
+
+### Auth — `/api/v1/auth` (requiere header `X-Tenant-ID` en login)
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| POST | `/api/v1/auth/login` | Login con username/password → accessToken + refreshToken |
-| POST | `/api/v1/auth/refresh` | Renovar accessToken con refreshToken |
+| POST | `/api/v1/auth/login` | Login con username/password → accessToken + refreshToken + tenantSlug |
+| POST | `/api/v1/auth/refresh` | Renovar accessToken (tenantSchema viene del refreshToken) |
 | POST | `/api/v1/auth/logout` | Revocar token (requiere JWT) |
 
 ### Users — `/api/v1/users` (requiere JWT)

@@ -33,12 +33,27 @@ public class JwtService {
         this.refreshExpirationMs = refreshExpirationMs;
     }
 
-    public String generateAccessToken(UUID userId, String username) {
-        return buildToken(userId, username, expirationMs, Map.of("type", "access"));
+    /**
+     * @param tenantSchema schema PostgreSQL del tenant (ej: "t_torresytorres").
+     *                     Embebido en el JWT para evitar DB lookups en cada request.
+     */
+    public String generateAccessToken(UUID userId, String username, String tenantSchema) {
+        return buildToken(userId, username, expirationMs, Map.of(
+                "type", "access",
+                "tenantSchema", tenantSchema
+        ));
     }
 
-    public String generateRefreshToken(UUID userId, String username) {
-        return buildToken(userId, username, refreshExpirationMs, Map.of("type", "refresh"));
+    public String generateRefreshToken(UUID userId, String username, String tenantSchema) {
+        return buildToken(userId, username, refreshExpirationMs, Map.of(
+                "type", "refresh",
+                "tenantSchema", tenantSchema
+        ));
+    }
+
+    /** Extrae el schema name del tenant embebido en el JWT. */
+    public String extractTenantSchema(String token) {
+        return extractClaim(token, claims -> claims.get("tenantSchema", String.class));
     }
 
     public boolean isTokenValid(String token) {

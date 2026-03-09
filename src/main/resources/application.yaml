@@ -8,7 +8,14 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
+  sql:
+    init:
+      # Ejecuta schema.sql antes del DDL de Hibernate (crea el schema landlord)
+      mode: always
+
   jpa:
+    # schema.sql debe correr ANTES que Hibernate DDL (default = false)
+    defer-datasource-initialization: false
     hibernate:
       ddl-auto: ${JPA_DDL_AUTO:update}
     show-sql: ${JPA_SHOW_SQL:false}

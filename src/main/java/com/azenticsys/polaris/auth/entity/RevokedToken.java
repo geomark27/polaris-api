@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "revoked_tokens", indexes = {
+@Table(schema = "landlord", name = "revoked_tokens", indexes = {
         @Index(name = "idx_revoked_tokens_jti", columnList = "jti")
 })
 public class RevokedToken {

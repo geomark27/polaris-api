@@ -1,6 +1,7 @@
 package com.azenticsys.polaris.config;
 
 import com.azenticsys.polaris.auth.repository.RevokedTokenRepository;
+import com.azenticsys.polaris.config.multitenancy.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,6 +49,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (revokedTokenRepository.existsByJti(jti)) {
             filterChain.doFilter(request, response);
             return;
+        }
+
+        // Sobreescribe el TenantContext con el schema embebido en el JWT (más seguro que el header)
+        final String tenantSchema = jwtService.extractTenantSchema(token);
+        if (tenantSchema != null && !tenantSchema.isBlank()) {
+            TenantContext.set(tenantSchema);
         }
 
         final String username = jwtService.extractUsername(token);
