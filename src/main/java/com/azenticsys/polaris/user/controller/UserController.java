@@ -2,6 +2,7 @@ package com.azenticsys.polaris.user.controller;
 
 import com.azenticsys.polaris.common.pagination.PageQuery;
 import com.azenticsys.polaris.common.pagination.PageResponse;
+import com.azenticsys.polaris.user.dto.ChangePasswordRequest;
 import com.azenticsys.polaris.user.dto.CreateUserRequest;
 import com.azenticsys.polaris.user.dto.UpdateUserRequest;
 import com.azenticsys.polaris.user.dto.UserFilter;
@@ -11,9 +12,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -58,6 +61,15 @@ public class UserController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         userService.softDelete(id);
+        return ResponseEntity.noContent().build();
+    }
+    
+    @PatchMapping("/me/password")
+    public ResponseEntity<Void> changePassword(
+        @Valid @RequestBody ChangePasswordRequest request, Authentication authentication
+    ) {
+        String username = authentication.getName();
+        userService.changePassword(username, request);
         return ResponseEntity.noContent().build();
     }
 }

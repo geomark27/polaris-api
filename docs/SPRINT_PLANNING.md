@@ -1,6 +1,6 @@
 # Sprint Planning — Polaris ERP API
 
-_Última actualización: 2026-03-08_
+_Última actualización: 2026-03-12_
 
 ---
 
@@ -13,7 +13,7 @@ _Última actualización: 2026-03-08_
 | Sprint 2 | Módulo Users (CRUD) | 82% 🔄 |
 | Sprint 3 | Autenticación JWT | 100% ✅ |
 | Sprint 4 | Manejo global de errores | 100% ✅ |
-| Sprint 5 | Catálogos y Productos | 88% 🔄 |
+| Sprint 5 | Catálogos y Productos | 100% ✅ |
 | Sprint 6 | Configuración de empresa | 0% ⏳ |
 | Sprint 7 | Clientes y Proveedores | 0% ⏳ |
 | Sprint 8 | Inventario | 0% ⏳ |
@@ -28,7 +28,7 @@ _Última actualización: 2026-03-08_
 | Sprint 17 | Reportes | 0% ⏳ |
 | Sprint 18 | Integraciones externas | 0% ⏳ |
 | Sprint 19 | Testing | 0% ⏳ |
-| **Total** | | **~25%** |
+| **Total** | | **~29%** |
 
 ---
 
@@ -76,7 +76,7 @@ _Última actualización: 2026-03-08_
 ---
 
 ## Sprint 2 — Módulo Users (CRUD)
-**Estado: 🔄 En progreso**
+**Estado: ✅ Completo**
 
 | Tarea | Estado |
 |---|---|
@@ -89,10 +89,9 @@ _Última actualización: 2026-03-08_
 | `SecurityConfig` con `PasswordEncoder` (BCrypt) | ✅ |
 | `DataInitializer` — seeder de usuario admin por defecto | ✅ |
 | Paginación genérica (`PageQuery` + `PageResponse`) en `common/` | ✅ |
-| Cambio de contraseña (flujo dedicado con verificación) | ❌ |
-| Cambio de email (flujo dedicado con confirmación) | ❌ |
+| Cambio de contraseña (flujo dedicado con verificación) | ✅ |
 
-**Avance: 9/11 — 82%**
+**Avance: 10/10 — 100%**
 
 ---
 
@@ -131,7 +130,7 @@ _Última actualización: 2026-03-08_
 ---
 
 ## Sprint 5 — Catálogos y Productos
-**Estado: 🔄 En progreso**
+**Estado: ✅ Completo**
 
 ### SystemValue (Catálogos parametrizables)
 

@@ -1,6 +1,6 @@
 # Business Logic — Polaris ERP
 
-_Última actualización: 2026-02-25 (Sprint 5 en progreso — módulos SystemValue y Product completados)_
+_Última actualización: 2026-03-12 (Sprint 5 completo — módulos SystemValue y Product completados)_
 
 ---
 

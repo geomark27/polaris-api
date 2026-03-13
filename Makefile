@@ -5,7 +5,7 @@
         test-unit test-integration \
         start quick-start dev ci \
         clean-all fresh-install \
-        status dependencies update restart \
+        status dependencies update restart gen-jwt \
         push pull git-status sync \
         module
 
@@ -79,6 +79,7 @@ help:
 	@echo "  $(YELLOW)make dependencies$(NC)       - Arbol de dependencias"
 	@echo "  $(YELLOW)make update$(NC)             - Ver actualizaciones disponibles"
 	@echo "  $(YELLOW)make ci$(NC)                 - Flujo CI (compile + test + package)"
+	@echo "  $(YELLOW)make gen-jwt$(NC)            - Genera JWT_SECRET seguro para .env"
 	@echo ""
 	@echo "$(GREEN)GIT:$(NC)"
 	@echo "  $(YELLOW)make push m='mensaje'$(NC)   - Add + Commit + Push"
@@ -318,6 +319,13 @@ dependencies:
 update:
 	@echo "$(GREEN)Actualizaciones disponibles:$(NC)"
 	@./mvnw versions:display-dependency-updates
+
+## gen-jwt: Genera un JWT_SECRET seguro (base64, 64 bytes)
+gen-jwt:
+	@echo "$(BLUE)JWT_SECRET generado:$(NC)"
+	@openssl rand -base64 64 | tr -d '\n'
+	@echo ""
+	@echo "$(YELLOW)Copia el valor anterior y pegalo en tu .env como JWT_SECRET=$(NC)"
 
 ## ci: Flujo completo de CI (compile + test + package)
 ci: compile test package

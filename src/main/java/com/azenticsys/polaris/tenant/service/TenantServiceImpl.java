@@ -113,10 +113,15 @@ public class TenantServiceImpl implements TenantService {
         }
 
         // FK: products → product_categories (no se copia con LIKE)
+        // PostgreSQL no soporta ADD CONSTRAINT IF NOT EXISTS, se usa DO block
         jdbcTemplate.execute(
+                "DO $$ BEGIN " +
+                "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_products_category' " +
+                "AND connamespace = '" + schemaName + "'::regnamespace) THEN " +
                 "ALTER TABLE " + schemaName + ".products " +
-                "ADD CONSTRAINT IF NOT EXISTS fk_products_category " +
-                "FOREIGN KEY (category_id) REFERENCES " + schemaName + ".product_categories(id)"
+                "ADD CONSTRAINT fk_products_category " +
+                "FOREIGN KEY (category_id) REFERENCES " + schemaName + ".product_categories(id); " +
+                "END IF; END $$"
         );
 
         log.info("Schema '{}' created with {} tables", schemaName, TENANT_TABLES.size());

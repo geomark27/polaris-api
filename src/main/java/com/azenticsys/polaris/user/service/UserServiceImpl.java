@@ -2,6 +2,7 @@ package com.azenticsys.polaris.user.service;
 
 import com.azenticsys.polaris.common.pagination.PageQuery;
 import com.azenticsys.polaris.common.pagination.PageResponse;
+import com.azenticsys.polaris.user.dto.ChangePasswordRequest;
 import com.azenticsys.polaris.user.dto.CreateUserRequest;
 import com.azenticsys.polaris.user.dto.UpdateUserRequest;
 import com.azenticsys.polaris.user.dto.UserFilter;
@@ -10,8 +11,8 @@ import com.azenticsys.polaris.user.entity.User;
 import com.azenticsys.polaris.user.repository.UserRepository;
 import com.azenticsys.polaris.user.repository.UserSpecification;
 import lombok.RequiredArgsConstructor;
-import lombok.var;
 
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,13 +57,12 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public PageResponse<UserResponse> findAll(PageQuery pageQuery, UserFilter filter) { 
-        var response = PageResponse.from(
+        return PageResponse.from(
             userRepository.findAll(
                 UserSpecification.withFilter(filter),
                 pageQuery.toPageable()
             ).map(UserResponse::from)
         );
-        return response;
     }
 
     @Override
@@ -97,5 +97,20 @@ public class UserServiceImpl implements UserService {
         return userRepository.findById(id)
                 .filter(u -> u.getDeletedAt() == null)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + id));
+    }
+    
+    @Override
+    @Transactional
+    public void changePassword(String username, ChangePasswordRequest request) {
+        User user = userRepository.findByUsernameAndDeletedAtIsNull(username)
+            .filter(User::isActive)
+            .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new BadCredentialsException("Current password is incorrect");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
     }
 }
